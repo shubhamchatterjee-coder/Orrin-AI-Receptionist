@@ -1,0 +1,5 @@
+node_modules/
+.n8n/
+*.exe
+.env
+web-demo/index.local.html

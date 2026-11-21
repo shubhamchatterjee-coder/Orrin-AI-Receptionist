@@ -1,0 +1,433 @@
+{
+  "name": "Workflow D: Sarah - Reschedule",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sarah-reschedule",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "90e9798e-355f-474b-8d66-133674f3304d",
+      "name": "Webhook",
+      "webhookId": "a67a8f99-ab58-411a-8990-dcbe80d8a013"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst call = (msg.toolCallList && msg.toolCallList[0]) || (msg.toolCalls && msg.toolCalls[0]) || null;\nlet args = call ? (call.arguments || (call.function && call.function.arguments) || {}) : body;\nif (typeof args === 'string') args = JSON.parse(args);\n\nconst date = String(args.date || '').trim();\nlet time = String(args.time || '').trim();\nconst m = time.match(/^(\\d{1,2}):(\\d{2})\\s*(am|pm)?/i);\nif (m) {\n  let h = parseInt(m[1], 10);\n  if (m[3] && m[3].toLowerCase() === 'pm' && h < 12) h += 12;\n  if (m[3] && m[3].toLowerCase() === 'am' && h === 12) h = 0;\n  time = String(h).padStart(2, '0') + ':' + m[2];\n}\nconst d = new Date(`${date}T${time}:00+05:30`);\nif (isNaN(d.getTime())) throw new Error('Bad date/time: ' + JSON.stringify(args));\n\nreturn [{ json: {\n  toolCallId: call ? call.id : 'test',\n  phone: String(args.phone || '').trim(),\n  date, time,\n  start: d.toISOString()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "351b106e-3012-4ab0-bffd-dfe5f7a5b4e4",
+      "name": "Parse"
+    },
+    {
+      "parameters": {
+        "jsCode": "const list = ($input.first().json.data) || [];\nif (!list.length) return [{ json: { found: false } }];\nreturn [{ json: { found: true, uid: list[0].uid } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "5f110b94-7922-4f02-8183-d623ef0b737c",
+      "name": "Pick"
+    },
+    {
+      "parameters": {
+        "url": "https://api.cal.com/v2/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "attendeeEmail",
+              "value": "={{ $json.phone }}@brightsmile.com"
+            },
+            {
+              "name": "status",
+              "value": "upcoming"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "cal-api-version",
+              "value": "2024-08-13"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "id": "42bdd11f-c6cd-464c-8543-cb3a68223bd4",
+      "name": "Find Booking",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2RsfMILW0hHavEeI",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "167c2b4d-0116-49d4-a367-10fb5fdc7d70",
+              "leftValue": "={{ $json.found }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        0
+      ],
+      "id": "71a5cbbd-9953-4945-8f0f-30d461eb4b6d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cal.com/v2/bookings/{{ $json.uid }}/reschedule",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "cal-api-version",
+              "value": "2024-08-13"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"start\": \"{{ $('Parse').first().json.start }}\",\n  \"reschedulingReason\": \"Rescheduled by patient via Sarah\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1168,
+        -144
+      ],
+      "id": "efd6ae0a-07ea-4653-b92e-a28e56b4d72d",
+      "name": "Reschedule Booking",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2RsfMILW0hHavEeI",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ",
+          "mode": "list",
+          "cachedResultName": "Orrin Bookings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Phone": "={{ $('Parse').first().json.phone }}",
+            "Date": "={{ $('Parse').first().json.date }}",
+            "Time": "={{ $('Parse').first().json.time }}",
+            "Status": "Rescheduled"
+          },
+          "matchingColumns": [
+            "Phone"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1440,
+        -160
+      ],
+      "id": "b5f8879b-fcd9-4742-b86e-c51f30ceff92",
+      "name": "Mark Rescheduled",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bEegHXe8X0i7g4bV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"results\": [ { \"toolCallId\": $('Parse').first().json.toolCallId, \"result\": \"Your appointment has been rescheduled to \" + $('Parse').first().json.date + \" at \" + $('Parse').first().json.time } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1664,
+        -160
+      ],
+      "id": "5db52d11-70c1-41d6-b410-9f5f086fdb3c",
+      "name": "Respond Rescheduled"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"results\": [ { \"toolCallId\": $('Parse').first().json.toolCallId, \"result\": \"That new time is not available. Please ask the patient for another day or time.\" } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1456,
+        48
+      ],
+      "id": "c545a343-cea9-4878-a6a4-3587bf45b896",
+      "name": "Respond Slot Unavailable"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"results\": [ { \"toolCallId\": $('Parse').first().json.toolCallId, \"result\": \"I could not find an upcoming appointment for that number.\" } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "5e79b234-8ce3-4034-b087-bf1461371d5a",
+      "name": "Respond Not Found"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Find Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Booking": {
+      "main": [
+        [
+          {
+            "node": "Pick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Reschedule Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reschedule Booking": {
+      "main": [
+        [
+          {
+            "node": "Mark Rescheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Slot Unavailable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Rescheduled": {
+      "main": [
+        [
+          {
+            "node": "Respond Rescheduled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f0b2ac8f-a6c1-4e9f-b870-da9bc1dbd7b5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3142ef9949cc441228684df67576b8b6639b2f58f044b7ce92f9fde61bb63b00"
+  },
+  "nodeGroups": [],
+  "id": "3VbRPdcP3UbfIfAW",
+  "tags": []
+}

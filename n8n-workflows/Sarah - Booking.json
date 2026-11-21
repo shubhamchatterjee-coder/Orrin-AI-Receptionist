@@ -1,0 +1,274 @@
+{
+  "name": "Sarah - Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sarah-booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "3e865eab-db98-4d23-badc-5a0e8eb57602",
+      "name": "Webhook",
+      "webhookId": "98284444-a185-466d-b384-f9d97c889814"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cal.com/v2/bookings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "cal-api-version",
+              "value": "2024-08-13"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"start\": \"{{ $json.start }}\",\n  \"username\": \"shubham-chatterjee-58skxa\",\n  \"eventTypeSlug\": \"dental-appointment\",\n  \"attendee\": {\n    \"name\": \"{{ $json.name }}\",\n    \"email\": \"{{ $json.phone }}@brightsmile.com\",\n    \"timeZone\": \"Asia/Kolkata\"\n  },\n  \"metadata\": { \"service\": \"{{ $json.service }}\" }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        352,
+        0
+      ],
+      "id": "66d45752-2994-4c09-8d43-26b216995ba8",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "2RsfMILW0hHavEeI",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"results\": [ { \"toolCallId\": $('Code').first().json.toolCallId, \"result\": \"Appointment booked for \" + $('Code').first().json.date + \" at \" + $('Code').first().json.time } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        800,
+        0
+      ],
+      "id": "12336030-5ae9-4b30-8f89-ac40db19fb45",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst msg = body.message || {};\nconst call = (msg.toolCallList && msg.toolCallList[0])\n  || (msg.toolCalls && msg.toolCalls[0])\n  || (msg.toolWithToolCallList && msg.toolWithToolCallList[0] && msg.toolWithToolCallList[0].toolCall)\n  || null;\n\nlet args;\nif (call) {\n  args = call.arguments || (call.function && call.function.arguments) || {};\n  if (typeof args === 'string') args = JSON.parse(args);\n} else {\n  args = body; // Vapi test button sends the fields directly\n}\n\nconst date = String(args.date || '').trim();\nlet time = String(args.time || '').trim();\nconst m = time.match(/^(\\d{1,2}):(\\d{2})\\s*(am|pm)?/i);\nif (m) {\n  let h = parseInt(m[1], 10);\n  if (m[3] && m[3].toLowerCase() === 'pm' && h < 12) h += 12;\n  if (m[3] && m[3].toLowerCase() === 'am' && h === 12) h = 0;\n  time = String(h).padStart(2, '0') + ':' + m[2];\n}\n\nconst d = new Date(`${date}T${time}:00+05:30`);\nif (isNaN(d.getTime())) {\n  throw new Error('Bad date/time. Got args: ' + JSON.stringify(args));\n}\n\nreturn [{ json: {\n  toolCallId: call ? call.id : 'test',\n  name: args.name,\n  phone: args.phone,\n  service: args.service,\n  date,\n  time,\n  start: d.toISOString()\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        0
+      ],
+      "id": "4e7dced8-ec17-45f0-bfd9-c6bdd79c06c7",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ",
+          "mode": "list",
+          "cachedResultName": "Orrin Bookings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1WGSCKrle7fVzXpQO1eDwgAmD5uPiYEKrP4dsS9t7JZQ/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $('Code').first().json.name }}",
+            "Phone": "={{ $('Code').first().json.phone }}",
+            "Date": "={{ $('Code').first().json.date }}",
+            "Time": "={{ $('Code').first().json.time }}",
+            "Status": "=Confirmed",
+            "Service": "={{ $('Code').first().json.service }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        576,
+        0
+      ],
+      "id": "918835f4-e7ee-4828-91af-2f119a631f27",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bEegHXe8X0i7g4bV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"results\": [ { \"toolCallId\": $('Code').first().json.toolCallId, \"result\": \"That slot is not available. Please ask the patient for another day or time.\" } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        576,
+        240
+      ],
+      "id": "79485159-92f4-4176-bd62-057ad5bad4af",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "56eb295a-0ac5-4e4b-8618-a8154c072dbc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3142ef9949cc441228684df67576b8b6639b2f58f044b7ce92f9fde61bb63b00"
+  },
+  "nodeGroups": [],
+  "id": "qTyXeyWaleVQ8qTN",
+  "tags": []
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orrin - Sarah, AI Dental Receptionist</title>
+<style>
+  :root { --teal:#0e9aa7; --dark:#0b3c49; --bg:#f2f8fa; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Segoe UI, Arial, sans-serif; background:var(--bg); color:#1c2b33; }
+  header { background:linear-gradient(120deg,var(--dark),var(--teal)); color:#fff; padding:28px 40px; }
+  header h1 { margin:0 0 6px; font-size:28px; }
+  header p { margin:0; opacity:.9; }
+  .wrap { max-width:1100px; margin:24px auto; padding:0 20px; display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:850px){ .wrap{ grid-template-columns:1fr; } }
+  .card { background:#fff; border-radius:16px; padding:22px; box-shadow:0 4px 16px rgba(0,0,0,.07); }
+  .card h2 { margin:0 0 14px; font-size:18px; color:var(--dark); }
+  .center { text-align:center; }
+  #btn { width:110px; height:110px; border-radius:50%; border:none; background:var(--teal); color:#fff; font-size:16px; font-weight:600; cursor:pointer; box-shadow:0 6px 18px rgba(14,154,167,.45); transition:.2s; }
+  #btn:hover { transform:scale(1.05); }
+  #btn.live { background:#d64545; box-shadow:0 6px 18px rgba(214,69,69,.45); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(214,69,69,.5);} 70%{box-shadow:0 0 0 22px rgba(214,69,69,0);} 100%{box-shadow:0 0 0 0 rgba(214,69,69,0);} }
+  #status { margin-top:14px; color:#667; min-height:20px; }
+  #log { margin-top:14px; height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .bubble { max-width:80%; padding:10px 14px; border-radius:14px; line-height:1.4; font-size:15px; }
+  .sarah { background:#e3f4f6; align-self:flex-start; border-bottom-left-radius:4px; }
+  .you { background:var(--teal); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+  .hint { font-size:13px; color:#778; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; background:var(--dark); color:#fff; padding:8px; }
+  td { padding:8px; border-bottom:1px solid #e5edf0; }
+  .tag { padding:2px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+  .Confirmed { background:#d9f5e3; color:#13763a; }
+  .Cancelled { background:#fde0e0; color:#b32424; }
+  .Rescheduled { background:#fff0d0; color:#9a6200; }
+  .full { grid-column:1 / -1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Orrin - Sarah</h1>
+  <p>AI voice receptionist for dental clinics. Book, reschedule or cancel by simply talking.</p>
+</header>
+
+<div class="wrap">
+  <div class="card center">
+    <h2>Talk to Sarah</h2>
+    <button id="btn">Start Call</button>
+    <div id="status">Click the button and allow the microphone.</div>
+    <p class="hint">Try: "Book an appointment", "Cancel my appointment", or "Do you accept insurance?"</p>
+  </div>
+
+  <div class="card">
+    <h2>Live conversation</h2>
+    <div id="log"></div>
+  </div>
+
+  <div class="card full">
+    <h2>Clinic bookings (live from Google Sheet)</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Phone</th><th>Service</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6">Loading...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+import Vapi from "https://esm.sh/@vapi-ai/web";
+
+const PUBLIC_KEY = "Put_public_key";
+const ASSISTANT_ID = "732f15f5-00ce-41cb-ba78-4815360d3ae9";
+const SHEET_CSV_URL = "Sheet_CSV_link";
+
+const vapi = new Vapi(PUBLIC_KEY);
+const btn = document.getElementById("btn");
+const log = document.getElementById("log");
+const status = document.getElementById("status");
+let on = false;
+
+btn.onclick = () => {
+  if (on) { vapi.stop(); }
+  else { status.textContent = "Connecting..."; vapi.start(ASSISTANT_ID); }
+};
+vapi.on("call-start", () => { on = true; btn.textContent = "End Call"; btn.classList.add("live"); status.textContent = "Connected. Sarah is listening."; });
+vapi.on("call-end", () => { on = false; btn.textContent = "Start Call"; btn.classList.remove("live"); status.textContent = "Call ended."; setTimeout(loadRows, 4000); });
+vapi.on("error", e => { status.textContent = "Error: " + (e && e.error && e.error.message ? e.error.message : JSON.stringify(e)); });
+vapi.on("message", m => {
+  if (m.type === "transcript" && m.transcriptType === "final") {
+    const d = document.createElement("div");
+    d.className = "bubble " + (m.role === "assistant" ? "sarah" : "you");
+    d.textContent = m.transcript;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  if (m.type === "tool-calls") { status.textContent = "Sarah is working on it..."; }
+});
+
+function parseCSV(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i+1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n") { row.push(cell); rows.push(row); row = []; cell = ""; }
+    else if (c !== "\r") cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+async function loadRows() {
+  const body = document.getElementById("rows");
+  if (SHEET_CSV_URL.startsWith("YAHAN")) { body.innerHTML = '<tr><td colspan="6">Add the Google Sheet CSV link in index.html</td></tr>'; return; }
+  try {
+    const res = await fetch(SHEET_CSV_URL + (SHEET_CSV_URL.includes("?") ? "&" : "?") + "t=" + Date.now());
+    const data = parseCSV(await res.text()).slice(1).filter(r => r[0]).reverse();
+    body.innerHTML = data.length ? data.map(r =>
+      "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td><td>" + (r[2]||"") + "</td><td>" + r[3] + "</td><td>" + r[4] +
+      '</td><td><span class="tag ' + r[5] + '">' + r[5] + "</span></td></tr>").join("")
+      : '<tr><td colspan="6">No bookings yet</td></tr>';
+  } catch (e) { body.innerHTML = '<tr><td colspan="6">Could not load bookings</td></tr>'; }
+}
+loadRows();
+setInterval(loadRows, 15000);
+</script>
+</body>
+</html>

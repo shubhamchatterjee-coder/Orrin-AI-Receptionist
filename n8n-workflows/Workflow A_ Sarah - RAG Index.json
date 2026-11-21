@@ -1,0 +1,140 @@
+{
+  "name": "Workflow A: Sarah - RAG Index",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "eae5f551-c6a6-4e71-bc3f-98859efdab14",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const faqs = [\n [\"timings\", \"What are the clinic timings?\", \"We are open Monday to Saturday, 9 AM to 5 PM. We are closed on Sundays.\"],\n [\"services\", \"What services do you offer?\", \"We offer checkups, cleaning, fillings, root canal treatment and teeth whitening.\"],\n [\"checkup_price\", \"How much does a checkup cost?\", \"A routine checkup costs 500 rupees.\"],\n [\"cleaning_price\", \"How much does teeth cleaning cost?\", \"Teeth cleaning costs 1,200 rupees.\"],\n [\"whitening_price\", \"How much does whitening cost?\", \"Teeth whitening costs 6,000 rupees per session.\"],\n [\"rootcanal_price\", \"How much does a root canal cost?\", \"Root canal treatment starts at 5,000 rupees, depending on the tooth.\"],\n [\"filling_price\", \"How much does a filling cost?\", \"Fillings start at 800 rupees per tooth.\"],\n [\"insurance\", \"Do you accept insurance?\", \"Yes, we accept most major dental insurance plans. Please bring your insurance card to the visit.\"],\n [\"cancellation\", \"What is the cancellation policy?\", \"You can cancel or reschedule free of charge up to 4 hours before your appointment.\"],\n [\"payment\", \"What payment methods do you accept?\", \"We accept cash, UPI, debit and credit cards.\"],\n [\"location\", \"Where is the clinic located?\", \"BrightSmile Dental Clinic is on the ground floor of City Plaza, near the main market, with parking available.\"],\n [\"first_visit\", \"What should I bring for my first visit?\", \"Please bring a photo ID, any previous dental records, and your insurance card if you have one.\"],\n [\"duration\", \"How long does a visit take?\", \"A checkup takes about 30 minutes. Whitening takes about 60 minutes.\"],\n [\"emergency\", \"Do you handle dental emergencies?\", \"For severe pain, swelling or injury, please visit the clinic directly during working hours so the doctor can see you as soon as possible.\"],\n [\"children\", \"Do you treat children?\", \"Yes, we treat patients of all ages, including children.\"]\n];\nreturn faqs.map(f => ({ json: { text: `Q: ${f[1]}\\nA: ${f[2]}`, topic: f[0] } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "19e363b7-c091-4f9b-97b6-82125194744e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "value": "clinic_faq",
+          "mode": "list"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "5e9f4666-a822-4a45-aba8-d524c88c2991",
+      "name": "Simple Vector Store"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        416,
+        208
+      ],
+      "id": "1c7cdfb7-b9d9-4cd1-9b98-9621763b3233",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "o44KdD1BFNiN2hYa",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        208
+      ],
+      "id": "df45d809-844b-4634-893d-b4879be4c7a1",
+      "name": "Default Data Loader"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "320f49eb-7b79-45b4-91ef-35e12199cf50",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3142ef9949cc441228684df67576b8b6639b2f58f044b7ce92f9fde61bb63b00"
+  },
+  "nodeGroups": [],
+  "id": "yVwvd6eUgkFcwBnD",
+  "tags": []
+}
